@@ -25,13 +25,11 @@ def signup():
         if user:
             return make_response({"message": "Please Sign In"}, 409)
 
-        user = (
-            Users(
-                email=email,
-                password=generate_password_hash(password),
-                firstName=firstName,
-                lastName=lastName,
-            ),
+        user = Users(
+            email=email,
+            password=generate_password_hash(password),
+            firstName=firstName,
+            lastName=lastName,
         )
 
         db.session.add(user)
