@@ -19,13 +19,14 @@ def token_required(f):
     @wraps(f)  # Preserves the original function's metadata (name, docstring)
     def decorated(*args, **kwargs):
         token = None
+
         if "Authorization" in request.headers:
             token = request.headers["Authorization"]
             print(token)
 
         # return 401 if token is not passed
         if not token:
-            return jsonify({"message": "Token is missing"}), 401
+            return jsonify({"message": "Token not provided!"}), 401
 
         try:
             data = jwt.decode(
@@ -34,52 +35,61 @@ def token_required(f):
                 algorithms=[os.getenv("JWT_ACCESS_HASH")],
             )
             current_user = Users.query.filter_by(id=data["id"]).first()
+
             print(current_user)
+
         except Exception as e:
             print(e)
-            return jsonify({"message": "Token is invalid"}), 401
+            return jsonify({"message": "Unauthorized!"}), 401
         return f(current_user, *args, **kwargs)
 
     return decorated
 
 
+# Register user
 @app.route("/signup", methods=["POST"])
 def signup():
     data = request.json
     email = data.get("email")
+    password = data.get("password")
     firstName = data.get("firstName")
     lastName = data.get("lastName")
-    password = data.get("password")
 
     if firstName and lastName and email and password:
         user = Users.query.filter_by(email=email).first()
-        if user:
-            return make_response({"message": "Please Sign In"}, 409)
 
+        if user:
+            return make_response(
+                {"message": "User already exist!"},
+                200,  # Already have an account, not a server error. You can use 409 depends on design
+            )
+        
         user = Users(
-            email=email,
-            password=generate_password_hash(password),
-            firstName=firstName,
-            lastName=lastName,
+            email=data["email"],
+            password=generate_password_hash(data["password"]),
+            firstName=data["firstName"],
+            lastName=data["lastName"],
         )
 
         db.session.add(user)
         db.session.commit()
 
-        return make_response({"message": "User created"}, 201)
+        return make_response({"message": "User created successfully!"}, 201)
+    
+    return make_response({"message": "Unable to create User"}, 500)
 
-    return make_response({"message": "Unable to create user"}, 500)
-
-
+# Login user
 @app.route("/login", methods=["POST"])
 def login():
     auth = request.json
+
     if not auth or not auth.get("email") or not auth.get("password"):
-        return make_response({"message": "Missing credentials"}, 401)
+        return make_response("Invalid credentials!", 401)
 
     user = Users.query.filter_by(email=auth.get("email")).first()
+
     if not user:
-        return make_response({"message": "User not found"}, 401)
+        return make_response("Account not found!", 401)
 
     if check_password_hash(user.password, auth.get("password")):
         token = jwt.encode(
@@ -87,16 +97,33 @@ def login():
             os.getenv("JWT_ACCESS_SECRET"),
             os.getenv("JWT_ACCESS_HASH"),
         )
-        return make_response({"access_token": token}, 200)
 
-    return make_response({"message": "Invalid credential"}, 401)
+        return make_response(jsonify({"token": token}), 201)
+
+    return make_response("Invalid credentials!", 401)
 
 
+# Create funds
+@app.route("/funds", methods=["POST"])
+@token_required
+def postFund(current):
+    data = request.json
+
+    if data["amount"]:
+        fund = Funds(amount=data["amount"], userId=current.id)
+        db.session.add(fund)
+        db.session.commit()
+        print(fund)
+
+    return fund.serialize
+
+# Get funds
 @app.route("/funds", methods=["GET"])
 @token_required
 def getAllFunds(current):
     funds = Funds.query.filter_by(userId=current.id).all()
     totalSum = 0
+
     if funds:
         totalSum = (
             Funds.query.with_entities(db.func.round(func.sum(Funds.amount), 2))
@@ -106,36 +133,27 @@ def getAllFunds(current):
 
     return jsonify({"data": [row.serialize for row in funds], "sum": totalSum})
 
-
+# Update funds
 @app.route("/funds/<id>", methods=["PUT"])
 @token_required
 def updateFund(current, id):
     try:
         funds = Funds.query.filter_by(userId=current.id, id=id).first()
+
         if funds == None:
             return {"message": "Unable to update"}, 409
         data = request.json
+
         if data["amount"]:
             funds.amount = data["amount"]
 
         db.session.commit()
 
         return {"message": funds.serialize}, 200
+    
     except Exception as e:
         print(e)
         return {"error": "Unable to process"}, 409
-
-
-@app.route("/funds", methods=["POST"])
-@token_required
-def postFund(current):
-    data = request.json
-    if data["amount"]:
-        fund = Funds(amount=data["amount"], userId=current.id)
-        db.session.add(fund)
-        db.session.commit()
-        print(fund)
-    return fund.serialize
 
 
 @app.route("/funds/<id>", methods=["DELETE"])
@@ -149,6 +167,7 @@ def deleteFund(current, id):
         db.session.commit()
 
         return {"message": "Deleted"}, 202
+    
     except Exception as e:
         print(e)
         return {"error": "Unable to process"}, 409

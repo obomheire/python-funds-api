@@ -10,8 +10,5 @@ app = Flask(__name__)
 db = SQLAlchemy()
 
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("POSTGRES_DATABASE_URI")
-# app.config["SQLALCHEMY_DATABASE_URI"] = (
-#     "postgresql://zackoverflow:Secret123@localhost:5432/postgres"
-# )
 
 db.init_app(app)
