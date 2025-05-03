@@ -6,12 +6,12 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 import jwt
-from flask import make_response, request, jsonify
+from flask import jsonify, make_response, request
+from sqlalchemy.sql import func
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import app, db
 from .models import Funds, Users
-from sqlalchemy.sql import func    
 
 
 # # Decorator for verifying the JWT
@@ -63,7 +63,7 @@ def signup():
                 {"message": "User already exist!"},
                 200,  # Already have an account, not a server error. You can use 409 depends on design
             )
-        
+
         user = Users(
             email=data["email"],
             password=generate_password_hash(data["password"]),
@@ -75,8 +75,9 @@ def signup():
         db.session.commit()
 
         return make_response({"message": "User created successfully!"}, 201)
-    
+
     return make_response({"message": "Unable to create User"}, 500)
+
 
 # Login user
 @app.route("/login", methods=["POST"])
@@ -117,6 +118,30 @@ def postFund(current):
 
     return fund.serialize
 
+
+# Update funds
+@app.route("/funds/<id>", methods=["PUT"])
+@token_required
+def updateFund(current, id):
+    try:
+        fund = Funds.query.filter_by(userId=current.id, id=id).first()
+
+        if fund == None:
+            return {"message": "Unable to update"}, 409
+        data = request.json
+
+        if data["amount"]:
+            fund.amount = data["amount"]
+
+        db.session.commit()
+
+        return {"message": fund.serialize}, 200
+
+    except Exception as e:
+        print(e)
+        return {"error": "Unable to process"}, 409
+
+
 # Get funds
 @app.route("/funds", methods=["GET"])
 @token_required
@@ -133,41 +158,37 @@ def getAllFunds(current):
 
     return jsonify({"data": [row.serialize for row in funds], "sum": totalSum})
 
-# Update funds
-@app.route("/funds/<id>", methods=["PUT"])
+
+# Get one fund
+@app.route("/funds/<id>", methods=["GET"])
 @token_required
-def updateFund(current, id):
+def getFund(current, id):
     try:
-        funds = Funds.query.filter_by(userId=current.id, id=id).first()
+        fund = Funds.query.filter_by(userId=current.id, id=id).first()
 
-        if funds == None:
-            return {"message": "Unable to update"}, 409
-        data = request.json
+        if fund == None:
+            return {"message": f"Fund with ID {id} not found"}, 404
 
-        if data["amount"]:
-            funds.amount = data["amount"]
+        return {"message": fund.serialize}, 200
 
-        db.session.commit()
-
-        return {"message": funds.serialize}, 200
-    
     except Exception as e:
         print(e)
-        return {"error": "Unable to process"}, 409
+        return {"error": "Unable to retrieve fund!"}, 409
 
 
+# Delete fund
 @app.route("/funds/<id>", methods=["DELETE"])
 @token_required
 def deleteFund(current, id):
     try:
-        funds = Funds.query.filter_by(userId=current.id, id=id).first()
-        if funds == None:
-            return {"message": f"Fund with {id} not found"}, 404
-        db.session.delete(funds)
+        fund = Funds.query.filter_by(userId=current.id, id=id).first()
+        if fund == None:
+            return {"message": f"Fund with ID {id} not found"}, 404
+        db.session.delete(fund)
         db.session.commit()
 
         return {"message": "Deleted"}, 202
-    
+
     except Exception as e:
         print(e)
-        return {"error": "Unable to process"}, 409
+        return {"error": "Unable to delete fund"}, 409
