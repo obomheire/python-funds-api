@@ -11,7 +11,8 @@ from sqlalchemy.sql import func
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import app, db
-from .models import Funds, Users
+from funds.funds_model import Funds
+from users.users_model import Users
 
 
 # # Decorator for verifying the JWT
