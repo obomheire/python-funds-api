@@ -13,7 +13,6 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from . import app, db
 from .models import Funds, Users
 
-
 # # Decorator for verifying the JWT
 def token_required(f):
     @wraps(f)  # Preserves the original function's metadata (name, docstring)
@@ -22,7 +21,6 @@ def token_required(f):
 
         if "Authorization" in request.headers:
             token = request.headers["Authorization"]
-            print(token)
 
         # return 401 if token is not passed
         if not token:
@@ -44,7 +42,6 @@ def token_required(f):
         return f(current_user, *args, **kwargs)
 
     return decorated
-
 
 # Register user
 @app.route("/signup", methods=["POST"])
@@ -78,7 +75,6 @@ def signup():
 
     return make_response({"message": "Unable to create User"}, 500)
 
-
 # Login user
 @app.route("/login", methods=["POST"])
 def login():
@@ -103,7 +99,6 @@ def login():
 
     return make_response("Invalid credentials!", 401)
 
-
 # Create funds
 @app.route("/funds", methods=["POST"])
 @token_required
@@ -117,7 +112,6 @@ def postFund(current):
         print(fund)
 
     return fund.serialize
-
 
 # Update funds
 @app.route("/funds/<id>", methods=["PUT"])
@@ -140,7 +134,6 @@ def updateFund(current, id):
     except Exception as e:
         print(e)
         return {"error": "Unable to process"}, 409
-
 
 # Get funds
 @app.route("/funds", methods=["GET"])
@@ -175,7 +168,6 @@ def getFund(current, id):
         print(e)
         return {"error": "Unable to retrieve fund!"}, 409
 
-
 # Delete fund
 @app.route("/funds/<id>", methods=["DELETE"])
 @token_required
@@ -192,3 +184,6 @@ def deleteFund(current, id):
     except Exception as e:
         print(e)
         return {"error": "Unable to delete fund"}, 409
+    
+# if __name__== "__main__":
+#     app.run(debug=True)
